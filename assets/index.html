@@ -59,7 +59,7 @@
     /* ================================================================
        [CINEHAX DESIGN SYSTEM]
        Basado en el tema Dooplay (WordPress) que usa cinehax.com
-       Fondo: #0e0e0e / #181818 — Acento: #3d5afe (índigo/azul)
+       Fondo: #0e0e0e / #181818 — Acento: #3d5afe (dorado/ámbar)
        Cards landscape 16:9 para home, portrait 2:3 para detalles
        ================================================================ */
     :root {
@@ -157,6 +157,14 @@
     /* BOTTOM NAV — oculto por defecto */
     .bottom-nav { display: none; }
 
+    /* ── DESKTOP: clase inyectada en <head> — nav visible antes del primer render ── */
+    html.desktop-mode .desktop-nav { display: flex !important; }
+    html.desktop-mode .bottom-nav  { display: none  !important; }
+    html.desktop-mode body         { padding-bottom: 0 !important; }
+    html.desktop-mode .hero        { margin-top: 62px !important; }
+    html.desktop-mode .detail-page,
+    html.desktop-mode .channels-page,
+    html.desktop-mode .anime-page  { padding-top: 62px !important; }
     /* ── DESKTOP: mouse real, pantalla grande ── */
     @media (hover:hover) and (pointer:fine) and (min-width:1025px) {
       .desktop-nav  { display: flex !important; }
@@ -309,9 +317,17 @@
     }
     .btn-info:hover { background: rgba(255,255,255,0.18); }
 
-    /* [CINEHAX] Indicadores del hero slideshow — ocultos */
-    .hero-dots { display:none !important; }
-    .hero-dot-btn { display:none !important; }
+    /* [CINEHAX] Indicadores del hero slideshow */
+    .hero-dots {
+      position:absolute; bottom:28px; left:60px; z-index:3;
+      display:flex; gap:6px;
+    }
+    .hero-dot-btn {
+      width:24px; height:3px; border-radius:2px;
+      background: rgba(255,255,255,0.3); border:none; cursor:pointer;
+      transition:all var(--trans); padding:0;
+    }
+    .hero-dot-btn.active { background: var(--accent); width:40px; }
 
     /* ================================================================
        [CINEHAX] GENRE PILLS — fila horizontal debajo del hero
@@ -969,16 +985,40 @@
       pointer-events:none; /* FIX ANDROID TV: toques pasan al iframe */
     }
     .player-back {
-      background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
-      color:#fff; width:36px; height:36px; border-radius:50%;
+      background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.15);
+      color:rgba(255,255,255,0.55); width:36px; height:36px; border-radius:50%;
       display:flex; align-items:center; justify-content:center;
-      cursor:pointer; transition:background var(--trans);
-      margin-top:10px; align-self:flex-start;
+      cursor:pointer; transition:background 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+      position:absolute; top:72px; left:16px; z-index:20; pointer-events:auto;
     }
-    .player-back:hover { background:rgba(255,255,255,0.22); }
+    .player-back:hover, .player-back:focus {
+      background:rgba(255,255,255,0.22);
+      border-color:rgba(255,255,255,0.6);
+      color:#fff;
+      box-shadow:0 0 12px rgba(255,255,255,0.2);
+      outline:none;
+    }
+    /* TV: botón más grande y visible para resolución 1080p/4K */
+    html.tv-mode .player-back {
+      width:52px; height:52px; top:80px; left:20px;
+      background:rgba(0,0,0,0.6);
+      border:2px solid rgba(255,255,255,0.2);
+      border-radius:50%;
+      backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
+    }
+    html.tv-mode .player-back svg { width:26px; height:26px; stroke-width:2.2; }
+    html.tv-mode .player-back:hover, html.tv-mode .player-back:focus {
+      background:rgba(61,90,254,0.75);
+      border-color:var(--accent);
+      box-shadow:0 0 0 3px rgba(61,90,254,0.35), 0 4px 20px rgba(0,0,0,0.6);
+      transform:scale(1.08);
+      color:#fff;
+    }
 
     /* ── Botón HOME persistente — siempre visible, estilo Netflix ── */
     .player-home-btn {
+      display: none !important; /* Casa eliminada — usar flecha en topbar */
       position: absolute;
       top: 18px; left: 18px;
       z-index: 500;
@@ -1716,9 +1756,6 @@
       background: rgba(255,255,255,0.07);
       margin: 6px 0;
     }
-    /* Botón pantalla completa: solo visible en TV mode */
-    #tvNavFullscreen { display: none !important; }
-    html.tv-mode #tvNavFullscreen { display: flex !important; }
     /* ═══════════════════════════════════════════════════════════
        TV TOPNAV — barra horizontal estilo Netflix
        Solo activa en tv-mode; reemplaza el sidebar lateral
@@ -1789,6 +1826,26 @@
     }
     .tv-topnav-search-btn:hover,
     .tv-topnav-search-btn:focus {
+      background: rgba(255,255,255,0.16);
+      border-color: var(--accent);
+      color: #fff;
+      outline: 2px solid rgba(61,90,254,0.5);
+      outline-offset: 2px;
+    }
+
+    /* Botón fullscreen topnav TV — solo visible en tv-mode */
+    .tv-topnav-fs-btn {
+      display: flex; align-items: center; justify-content: center;
+      margin-left: 8px;
+      background: rgba(255,255,255,0.08);
+      border: 1.5px solid rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.78);
+      width: 44px; height: 44px; border-radius: 8px;
+      cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+      outline: none;
+    }
+    .tv-topnav-fs-btn:hover,
+    .tv-topnav-fs-btn:focus {
       background: rgba(255,255,255,0.16);
       border-color: var(--accent);
       color: #fff;
@@ -1985,6 +2042,9 @@
       font-size: 1rem !important;
     }
     html.tv-mode #btnCast { padding: 8px 16px !important; font-size: 0.85rem !important; }
+    #btnCast { display: none !important; } /* Enviar a TV eliminado */
+    /* Canales TV ocultos de todos los menús */
+    #nlCanales, #tnCanales, #tvNavCanales, #bmCanales { display: none !important; }
 
     /* Cast modal responsive */
     #castModal { display: none; }
@@ -2219,6 +2279,7 @@
     <button class="nav-hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menú">
       <span></span><span></span><span></span>
     </button>
+    <div class="nav-profile">S</div>
   </div>
 </nav>
 
@@ -2258,6 +2319,12 @@
     </svg>
     Buscar
   </button>
+  <button class="tv-topnav-fs-btn" id="tnFullscreen"
+          onclick="toggleAppFullscreen()" tabindex="-1" title="Pantalla completa">
+    <svg id="iconAppFS" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+    </svg>
+  </button>
 </nav>
 
 <div class="tv-sidebar-overlay" id="tvSidebarOverlay" onclick="closeTvSidebar()"></div>
@@ -2291,10 +2358,6 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     <span>Buscar</span>
   </button>
-  <button class="tv-nav-item" id="tvNavFullscreen" onclick="togglePlayerFullscreen();closeTvSidebar()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-    <span>Pantalla completa</span>
-  </button>
 </aside>
 
 <!-- ============================================================
@@ -2309,7 +2372,7 @@
          placeholder="Buscar películas, series, canales..."
          autocomplete="off" enterkeyhint="search" spellcheck="false"
          oninput="handleSearch(this.value)"
-         onkeydown="if(event.key==='Escape')closeTvSearchBar();"
+         onkeydown="if(event.key==='Escape')closeTvSearchBar();if(event.key==='Enter'&&this.value.trim()){handleSearch(this.value);setTimeout(function(){closeTvSearchBar()},600)}"
          onfocus="try{AndroidKeyboard.showKeyboard()}catch(e){}"
          onblur="try{AndroidKeyboard.hideKeyboard()}catch(e){}">
   <button class="tv-search-bar-close" onclick="closeTvSearchBar()" title="Cerrar búsqueda">✕</button>
@@ -2345,7 +2408,7 @@
 
 <!-- Submenú "Más" del bottom nav -->
 <div class="bottom-more-menu" id="bottomMoreMenu">
-  <a onclick="showChannelsPage();closeBottomMore();setBottomActive('bnMore')">
+  <a id="bmCanales" onclick="showChannelsPage();closeBottomMore();setBottomActive('bnMore')">
     <span class="bm-icon">📡</span> Canales TV
   </a>
   <a onclick="showAnimePage();closeBottomMore();setBottomActive('bnMore')">
@@ -2362,9 +2425,9 @@
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
       <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
     </svg>
-    <input type="text" id="searchInput" placeholder="Buscar título..."
+    <input type="search" id="searchInput" placeholder="Buscar título..."
            oninput="handleSearch(this.value)"
-           onkeydown="if(event.key==='Escape')closeMobileSearch()"
+           onkeydown="if(event.key==='Enter'&&this.value.trim()){handleSearch(this.value);var p=document.getElementById('mobileSearchPanel');if(p)p.classList.remove('open')}"
            autocomplete="off" autocorrect="off" autocapitalize="off"
            spellcheck="false" enterkeyhint="search"
            onfocus="try{AndroidKeyboard.showKeyboard()}catch(e){}"
@@ -3265,12 +3328,36 @@
      ============================================================ -->
 <div class="player-page" id="playerPage">
 
+  <!-- Botón HOME siempre visible — independiente de los controles (estilo Netflix) -->
+  <button class="player-home-btn" id="playerHomeBtn" onclick="closePlayer()" title="Volver al inicio" tabindex="0">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  </button>
+
+  <button class="player-back" onclick="closePlayer()" title="Volver">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+  </button>
   <div class="player-topbar">
-    <button class="player-back" onclick="closePlayer()">←</button>
     <div class="player-title" id="playerTitle">Cargando...</div>
     <div class="player-ep-info" id="playerEpInfo"></div>
     <div class="source-selector" id="sourceSelector" style="display:none;"></div>
     <!-- Botón fullscreen propio — llama directo a Java para girar en móvil -->
+    <!-- Botón Cast / Reproductor externo -->
+    <button id="btnCast" onclick="openCastModal()"
+            style="background:none;border:1px solid rgba(61,90,254,0.4);border-radius:6px;cursor:pointer;padding:5px 10px;color:var(--accent);opacity:0.9;display:flex;align-items:center;gap:5px;font-size:0.75rem;font-weight:600;margin-right:4px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M2 8.5A12.5 12.5 0 0 1 14.5 21"/>
+        <path d="M2 14a7 7 0 0 1 7 7"/>
+        <circle cx="2" cy="21" r="1" fill="currentColor"/>
+        <rect x="14" y="3" width="8" height="5" rx="1"/>
+        <path d="M14 8v5a2 2 0 0 1-2 2H4"/>
+      </svg>
+      <span class="cast-label">Enviar a TV</span>
+    </button>
     <button id="btnFullscreen" onclick="togglePlayerFullscreen()"
             style="background:none;border:none;cursor:pointer;padding:6px;color:#fff;opacity:0.85;display:flex;align-items:center">
       <svg id="iconFullscreen" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -4191,8 +4278,9 @@
       if (isTV) _tvControlsHidden = true;
     }
 
-    // Mousemove sobre el player (topbar / bottombar / bordes) → mostrar controles
+    // Mousemove / pointermove sobre el player → mostrar controles (Magic Remote LG usa pointermove)
     page.addEventListener('mousemove', showControls);
+    page.addEventListener('pointermove', showControls);
 
     // Hover sobre topbar o bottombar → suspender el timer mientras se está encima
     [topbar, bottomEl].forEach(el => {
@@ -4206,17 +4294,21 @@
     // Mouse sale del player → ocultar de inmediato
     page.addEventListener('mouseleave', hideControlsNow);
 
-    // Overlay sobre el iframe: clic cuando controles están ocultos → mostrar
+    // Overlay sobre el iframe: clic/move cuando controles están ocultos → mostrar
     if(overlay){
       overlay.addEventListener('click', (e)=>{
         e.stopPropagation();
         showControls();
       });
+      // Cuando controles ocultos el overlay tiene pointer-events:auto y captura el cursor
+      // Esto activa showControls() al mover el Magic Remote sobre el área de video
+      overlay.addEventListener('mousemove', showControls);
+      overlay.addEventListener('pointermove', showControls);
     }
 
     // Touch: tap sobre el video → alternar visibilidad
     page.addEventListener('touchstart', (e)=>{
-      if(e.target.closest('.player-topbar, .player-bottom, .ep-controls-row, .autonext-banner, .player-next-ep-btn, .tv-toggle-controls, #btnCast')) return;
+      if(e.target.closest('.player-topbar, .player-bottom, .ep-controls-row, .autonext-banner, .player-next-ep-btn, .tv-toggle-controls, #btnCast, .player-back')) return;
       if(page.classList.contains('controls-hidden')){
         showControls();
       } else {
@@ -4437,6 +4529,46 @@
   }
   function toggleMobileMenu(){ /* legacy - no-op */ }
   function closeMobileMenu(){ /* legacy - no-op */ }
+
+  // ── TV: pantalla completa de la app (topnav) ─────────────────────────
+  var _appFSActive = false;
+  var _appFSIcon_ON  = '<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>';
+  var _appFSIcon_OFF = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
+
+  function _requestAppFS(){
+    var el = document.documentElement;
+    (el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el);
+  }
+  function toggleAppFullscreen(){
+    var icon = document.getElementById('iconAppFS');
+    if(!_appFSActive){
+      _appFSActive = true;
+      _requestAppFS();
+      if(icon) icon.innerHTML = _appFSIcon_ON;
+    } else {
+      _appFSActive = false;
+      (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document);
+      if(icon) icon.innerHTML = _appFSIcon_OFF;
+    }
+  }
+  // Si el browser sale de fullscreen por cualquier razón (player, ESC, etc.)
+  // y el usuario quería fullscreen activo → volver a entrar automáticamente
+  document.addEventListener('fullscreenchange', function(){
+    var icon = document.getElementById('iconAppFS');
+    if(!document.fullscreenElement){
+      if(_appFSActive){
+        // Salida involuntaria — re-entrar con pequeño delay para que el browser se estabilice
+        setTimeout(_requestAppFS, 300);
+      } else {
+        if(icon) icon.innerHTML = _appFSIcon_OFF;
+      }
+    }
+  });
+  document.addEventListener('webkitfullscreenchange', function(){
+    if(!document.webkitFullscreenElement && _appFSActive){
+      setTimeout(_requestAppFS, 300);
+    }
+  });
 
   // ── TV: abrir/cerrar barra de búsqueda superior ──────────────────────
   function openTvSearchBar(){
@@ -5607,15 +5739,10 @@
     try{const d=await tmdb(`/search/multi?language=${LANG}&query=${encodeURIComponent(query)}`);tmdbResults=d.results.filter(i=>i.media_type!=='person'&&(i.poster_path||i.name||i.title));}
     catch(e){console.error(e);}
 
-    const total=channelResults.length+tmdbResults.length;
+    const total=tmdbResults.length;
     document.getElementById('resultsCount').innerHTML=`${total} resultados`;
     container.innerHTML='';
-    if(channelResults.length){
-      const sec=document.createElement('div');sec.className='results-section';
-      sec.innerHTML='<h3>📺 Canales TV</h3><div class="results-channels" id="channelResultsGrid"></div>';
-      container.appendChild(sec);
-      channelResults.forEach(ch=>sec.querySelector('#channelResultsGrid').appendChild(createCompactChannelCard(ch)));
-    }
+    /* Canales TV excluidos del buscador */
     if(tmdbResults.length){
       const sec=document.createElement('div');sec.className='results-section';
       sec.innerHTML='<h3>🎬 Películas y Series</h3><div class="results-grid" id="tmdbResultsGrid"></div>';
