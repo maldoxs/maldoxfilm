@@ -90,11 +90,17 @@
       html { scroll-behavior: smooth; }
     }
     body {
-      background: var(--bg);
-      color: var(--text);
+      background: #0e0e0e; background: var(--bg);   /* fallback WebOS sin CSS vars */
+      color: #f0f0f0;      color: var(--text);
       font-family: 'Roboto', system-ui, -apple-system, sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
+    }
+    /* Fallback colores hardcodeados para WebOS/Tizen sin soporte de CSS variables */
+    .tv-topnav  { background: #0e0e0e !important; }
+    .home-page, .movies-page, .series-page, .anime-page, .mi-lista-page,
+    .channels-page, .detail-page, .player-page, .all-results-page {
+      background: #0e0e0e; background: var(--bg);
     }
     body::-webkit-scrollbar { width: 6px; }
     body::-webkit-scrollbar-track { background: var(--bg); }
@@ -796,8 +802,24 @@
     /* ================================================================
        PÁGINAS CANALES / ANIME / PELÍCULAS / SERIES
        ================================================================ */
-    .channels-page, .anime-page, .movies-page, .series-page { display:none; padding-top:62px; }
-    .channels-page.active, .anime-page.active, .movies-page.active, .series-page.active { display:block; }
+    .channels-page, .anime-page, .movies-page, .series-page, .mi-lista-page { display:none; padding-top:62px; }
+    .channels-page.active, .anime-page.active, .movies-page.active, .series-page.active, .mi-lista-page.active { display:block; }
+    /* Botón × eliminar en tarjetas de Mi Lista */
+    .ml-card-wrap { position:relative; }
+    .ml-del-btn {
+      position:absolute; top:5px; right:5px; z-index:10;
+      width:26px; height:26px; border-radius:50%;
+      background:rgba(0,0,0,0.75); border:1.5px solid rgba(255,255,255,0.25);
+      color:#fff; font-size:0.85rem; line-height:1;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; opacity:0; transition:opacity 0.18s, background 0.18s;
+      pointer-events:auto;
+    }
+    .ml-card-wrap:hover .ml-del-btn { opacity:1; }
+    .ml-del-btn:hover { background:rgba(220,50,50,0.85); border-color:rgba(255,80,80,0.6); }
+    /* En TV: siempre visible (no hover) */
+    html.tv-mode .ml-del-btn { opacity:0.7; width:32px; height:32px; font-size:1rem; }
+    html.tv-mode .ml-del-btn:focus { opacity:1; background:rgba(220,50,50,0.9); outline:2px solid #f55; }
 
     .channels-hero, .anime-hero {
       position:relative; height:38vh; min-height:260px;
@@ -2259,6 +2281,7 @@
       <li><a id="nlSeries" onclick="loadSection('tv')">Series</a></li>
       <li><a id="nlCanales" onclick="showChannelsPage()">Canales TV</a></li>
       <li><a id="nlAnime" onclick="showAnimePage()">Anime</a></li>
+      <li><a id="nlMiLista" onclick="showMiListaPage()">Mi Lista</a></li>
     </ul>
   </div>
   <div class="nav-right">
@@ -2298,6 +2321,10 @@
     <button class="tv-topnav-item" id="tnAnime"
             onclick="showAnimePage();setTopNavActive('tnAnime')" tabindex="0">
       Anime
+    </button>
+    <button class="tv-topnav-item" id="tnMiLista"
+            onclick="showMiListaPage();setTopNavActive('tnMiLista')" tabindex="0">
+      Mi Lista
     </button>
     <button class="tv-topnav-item" id="tnCanales"
             onclick="showChannelsPage();setTopNavActive('tnCanales')" tabindex="0">
@@ -2444,24 +2471,6 @@
     <div class="hero-dots" id="heroDots"></div>
   </div>
 
-  <!-- ============================================================
-       CONTINUAR VIENDO — aparece solo si hay progreso guardado
-       ============================================================ -->
-  <div class="continue-section" id="continueSection">
-    <div class="section-header">
-      <div class="section-title">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Continuar viendo
-      </div>
-      <button class="see-all-btn" onclick="clearAllProgress()">Limpiar historial</button>
-    </div>
-    <div class="carousel-wrapper">
-      <button class="carousel-arrow prev" onclick="scrollCarousel('continueCarousel',-1)">‹</button>
-      <div class="continue-carousel" id="continueCarousel"></div>
-      <button class="carousel-arrow next" onclick="scrollCarousel('continueCarousel',1)">›</button>
-    </div>
-  </div>
-
   <!-- [CINEHAX] Filtros de género -->
   <div class="genre-bar" id="homeGenreBar">
     <div class="genre-pill active" onclick="filterHomeGenre(0,this)">Todo</div>
@@ -2481,6 +2490,24 @@
     <button class="tab" onclick="switchTab('popular',this)">Populares</button>
   </div>
   <div class="sub-genre-bar" id="categories"></div>
+
+  <!-- ============================================================
+       CONTINUAR VIENDO — aparece solo si hay progreso guardado
+       ============================================================ -->
+  <div class="continue-section" id="continueSection">
+    <div class="section-header">
+      <div class="section-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Continuar viendo
+      </div>
+      <button class="see-all-btn" onclick="clearAllProgress()">Limpiar historial</button>
+    </div>
+    <div class="carousel-wrapper">
+      <button class="carousel-arrow prev" onclick="scrollCarousel('continueCarousel',-1)">‹</button>
+      <div class="continue-carousel" id="continueCarousel"></div>
+      <button class="carousel-arrow next" onclick="scrollCarousel('continueCarousel',1)">›</button>
+    </div>
+  </div>
 
   <!-- Carruseles -->
   <div class="section">
@@ -4809,6 +4836,7 @@
     document.getElementById('animePage').classList.remove('active');
     document.getElementById('moviesPage').classList.remove('active');
     document.getElementById('seriesPage').classList.remove('active');
+    document.getElementById('miListaPage').classList.remove('active');
     document.getElementById('searchPage').style.display='none';
     document.getElementById('detailPage').classList.remove('active');
     document.body.style.overflow='';
@@ -4828,6 +4856,7 @@
     document.getElementById('animePage').classList.remove('active');
     document.getElementById('moviesPage').classList.remove('active');
     document.getElementById('seriesPage').classList.remove('active');
+    document.getElementById('miListaPage').classList.remove('active');
     document.getElementById('searchPage').style.display='none';
     document.getElementById('detailPage').classList.remove('active');
     document.body.style.overflow='';
@@ -4840,6 +4869,7 @@
     document.getElementById('animePage').classList.add('active');
     document.getElementById('moviesPage').classList.remove('active');
     document.getElementById('seriesPage').classList.remove('active');
+    document.getElementById('miListaPage').classList.remove('active');
     document.getElementById('searchPage').style.display='none';
     document.getElementById('detailPage').classList.remove('active');
     document.body.style.overflow='';
@@ -4870,6 +4900,7 @@
     document.getElementById('animePage').classList.remove('active');
     document.getElementById('moviesPage').classList.add('active');
     document.getElementById('seriesPage').classList.remove('active');
+    document.getElementById('miListaPage').classList.remove('active');
     document.getElementById('searchPage').style.display='none';
     document.getElementById('detailPage').classList.remove('active');
     document.body.style.overflow='';
@@ -4892,6 +4923,7 @@
     document.getElementById('animePage').classList.remove('active');
     document.getElementById('moviesPage').classList.remove('active');
     document.getElementById('seriesPage').classList.add('active');
+    document.getElementById('miListaPage').classList.remove('active');
     document.getElementById('searchPage').style.display='none';
     document.getElementById('detailPage').classList.remove('active');
     document.body.style.overflow='';
@@ -6361,7 +6393,7 @@
   // ════════════════════════════════════════════════
   // TV TOPNAV — navegación D-pad y estado activo
   // ════════════════════════════════════════════════
-  var _tvTopNavIds = ['tnInicio','tnPeliculas','tnSeries','tnAnime','tnCanales','tnSearch'];
+  var _tvTopNavIds = ['tnInicio','tnPeliculas','tnSeries','tnAnime','tnMiLista','tnCanales','tnSearch'];
 
   // ── Filtrar por género desde la fila de pills (TV mode) ──
   async function tvFilterGenre(genreId, name){
@@ -6759,8 +6791,9 @@
   let dpData=null, dpCurrentSeason=1, dpMyList=JSON.parse(safeStorage.getItem('sx_mylist')||'[]');
 
   function showDetailPage(id,type){
-    // Cerrar overlay "Ver Todo" si está abierto (z-index 610 tapaba la página de detalle)
+    // Cerrar overlays si están abiertos (z-index 610 tapaban la página de detalle)
     closeAllResults();
+    closeMiLista();
     _preheatPlayerFrame(); // Pre-establecer conexión TCP con unlimplay mientras el usuario lee los detalles
     // Guardar sección y filtro activo para "Volver"
     _navState.scrollY = window.scrollY;
@@ -6820,7 +6853,7 @@
     const backdrop=d.backdrop_path?`${IMG}original${d.backdrop_path}`:'';
     const isTV=type==='tv';
     const prog=getProgress(id,type);
-    const inList=dpMyList.includes(String(id));
+    const inList=_mlInList(id);
 
     document.title=`${title} — MaldoxFilm`;
     if(backdrop) document.getElementById('dpHeroBg').style.backgroundImage=`url(${backdrop})`;
@@ -6839,7 +6872,7 @@
       <div class="dp-overview">${escapeHtml(overview)}</div>
       <div class="dp-actions">
         <button class="dp-play-btn" onclick="openPlayer({id:${id},type:'${type}',title:'${escapeHtml(title).replace(/'/g,"\'")}',seasons:${seasons}})">▶ ${escapeHtml(progLabel)}</button>
-        <button class="dp-sec-btn ${inList?'added':''}" id="dpListBtn" onclick="dpToggleList(${id},'${escapeHtml(title).replace(/'/g,"\'")}')">
+        <button class="dp-sec-btn ${inList?'added':''}" id="dpListBtn" onclick="dpToggleList(${id},'${escapeHtml(title).replace(/'/g,"\\'")}','${type}','${d.poster_path||''}')">
           ${inList?'✓ En Mi Lista':'+ Mi Lista'}
         </button>
         <button class="dp-sec-btn" onclick="goBack()">← Volver</button>
@@ -6944,14 +6977,97 @@
     }catch(e){grid.innerHTML='<p style="color:var(--text-muted);font-size:.84rem;padding:12px 0">No se pudo cargar esta temporada.</p>';}
   }
 
-  function dpToggleList(id,title){
-    const sid=String(id);
-    const idx=dpMyList.indexOf(sid);
-    if(idx>=0){dpMyList.splice(idx,1);showToast('Eliminado de Mi Lista');}
-    else{dpMyList.push(sid);showToast(`"${title}" añadido a Mi Lista`);}
+  // Helpers para Mi Lista (compatible con formato viejo string y nuevo objeto)
+  function _mlId(item){ return String(typeof item==='object'?item.id:item); }
+  function _mlInList(id){ return dpMyList.some(item=>_mlId(item)===String(id)); }
+  function _mlIdx(id){ return dpMyList.findIndex(item=>_mlId(item)===String(id)); }
+
+  function dpToggleList(id,title,type,poster){
+    const inList=_mlInList(id);
+    if(inList){
+      dpMyList.splice(_mlIdx(id),1);
+      showToast('Eliminado de Mi Lista');
+    } else {
+      dpMyList.push({id:String(id),type:type||'movie',title:title||'',poster:poster||''});
+      showToast(`"${title}" añadido a Mi Lista`);
+    }
     safeStorage.setItem('sx_mylist',JSON.stringify(dpMyList));
     const btn=document.getElementById('dpListBtn');
-    if(btn){const inList=dpMyList.includes(sid);btn.textContent=inList?'✓ En Mi Lista':'+ Mi Lista';btn.classList.toggle('added',inList);}
+    if(btn){
+      const now=_mlInList(id);
+      btn.textContent=now?'✓ En Mi Lista':'+ Mi Lista';
+      btn.classList.toggle('added',now);
+    }
+  }
+
+  function showMiListaPage(){
+    const page=document.getElementById('miListaPage');
+    if(!page) return;
+    // Ocultar TODAS las páginas y overlays
+    document.getElementById('homePage').classList.add('hidden');
+    document.getElementById('channelsPage').classList.remove('active');
+    document.getElementById('animePage').classList.remove('active');
+    document.getElementById('moviesPage').classList.remove('active');
+    document.getElementById('seriesPage').classList.remove('active');
+    document.getElementById('detailPage').classList.remove('active');
+    document.body.style.overflow='';
+    closeAllResults();
+    page.classList.add('active');
+    window.scrollTo(0,0);
+    const grid=document.getElementById('miListaGrid');
+    const count=document.getElementById('miListaCount');
+    grid.innerHTML='';
+    if(!dpMyList.length){
+      grid.innerHTML='<p style="color:var(--text-muted);text-align:center;padding:60px;grid-column:1/-1">Tu lista está vacía.<br>Añade películas y series desde su página de detalle.</p>';
+      if(count) count.textContent='';
+      return;
+    }
+    if(count) count.textContent=dpMyList.length+' título'+(dpMyList.length!==1?'s':'');
+    const IMG='https://image.tmdb.org/t/p/w342';
+    dpMyList.slice().reverse().forEach(function(item){
+      const id=_mlId(item);
+      const type=(typeof item==='object'&&item.type)||'movie';
+      const title=(typeof item==='object'&&item.title)||'';
+      const poster=(typeof item==='object'&&item.poster)||'';
+      const wrap=document.createElement('div');
+      wrap.className='ml-card-wrap';
+      const div=document.createElement('div');
+      div.className='card'; div.tabIndex=0;
+      div.onclick=function(){ closeMiLista(); showDetailPage(id,type); };
+      div.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); div.click(); } };
+      div.innerHTML=poster
+        ?`<img class="card-img" src="${IMG}${poster}" alt="${escapeHtml(title)}" loading="lazy">`
+        :`<div class="card-img" style="background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:.75rem;text-align:center;padding:8px">${escapeHtml(title)||'Sin imagen'}</div>`;
+      if(title){
+        const lbl=document.createElement('div');
+        lbl.className='card-title'; lbl.textContent=title;
+        div.appendChild(lbl);
+      }
+      const delBtn=document.createElement('button');
+      delBtn.className='ml-del-btn';
+      delBtn.innerHTML='&#10005;';
+      delBtn.title='Eliminar de Mi Lista';
+      delBtn.onclick=function(e){ e.stopPropagation(); mlRemoveItem(id); };
+      delBtn.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); e.stopPropagation(); mlRemoveItem(id); } };
+      wrap.appendChild(div);
+      wrap.appendChild(delBtn);
+      grid.appendChild(wrap);
+    });
+  }
+
+  function closeMiLista(){
+    const page=document.getElementById('miListaPage');
+    if(page) page.classList.remove('active');
+  }
+
+  function mlRemoveItem(id){
+    const idx=_mlIdx(id);
+    if(idx===-1) return;
+    const title=typeof dpMyList[idx]==='object'?dpMyList[idx].title:'';
+    dpMyList.splice(idx,1);
+    safeStorage.setItem('sx_mylist',JSON.stringify(dpMyList));
+    showToast(title?`"${title}" eliminado de Mi Lista`:'Eliminado de Mi Lista');
+    showMiListaPage();
   }
 
   function dpOpenTM(key){document.getElementById('dpTrailerFrame').src=`https://www.youtube.com/embed/${key}?autoplay=1`;document.getElementById('dpTrailerModal').classList.add('open');}
@@ -7430,6 +7546,22 @@
 </script>
 
 <!-- ── All Results Overlay ── -->
+<!-- ── MI LISTA PAGE ── -->
+<div class="mi-lista-page" id="miListaPage">
+  <div style="padding:28px 40px 0">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <div style="width:4px;height:32px;background:var(--accent);border-radius:2px;flex-shrink:0"></div>
+      <div>
+        <div style="font-family:'Oswald',sans-serif;font-size:1.8rem;font-weight:700;text-transform:uppercase;letter-spacing:1px">Mi Lista</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px" id="miListaCount">Tus películas y series guardadas</div>
+      </div>
+    </div>
+  </div>
+  <div style="padding:0 40px 80px">
+    <div class="all-results-grid" id="miListaGrid"></div>
+  </div>
+</div>
+
 <div class="all-results-page" id="allResultsPage" role="dialog" aria-modal="true">
   <div class="all-results-header">
     <button class="all-results-back" onclick="closeAllResults()" tabindex="0">← Volver</button>
