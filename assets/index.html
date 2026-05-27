@@ -11,8 +11,8 @@
   <link rel="preconnect" href="https://image.tmdb.org">
   <!-- Preconectar al servidor de video — establece TCP+TLS ANTES del clic del usuario -->
   <!-- Esto ahorra 300-800ms de handshake cuando abre el reproductor -->
-  <link rel="preconnect" href="https://unlimplay.com" crossorigin>
-  <link rel="dns-prefetch" href="https://unlimplay.com">
+  <link rel="preconnect" href="https://stream-vault-two-phi.vercel.app" crossorigin>
+  <link rel="dns-prefetch" href="https://stream-vault-two-phi.vercel.app">
   <!-- Preconectar a la API TVLibre — establece TCP+TLS antes de la petición -->
   <link rel="preconnect" href="https://apifutboltv.onrender.com" crossorigin>
   <link rel="dns-prefetch" href="https://apifutboltv.onrender.com">
@@ -1097,9 +1097,9 @@
     .player-ep-info { font-size:0.76rem; color:var(--text-muted); white-space:nowrap; }
     .source-selector { display:flex; gap:5px; flex-wrap:wrap; }
     .source-btn {
-      padding:4px 11px; border-radius:3px; border:1px solid rgba(255,255,255,0.18);
+      padding:3px 8px; border-radius:3px; border:1px solid rgba(255,255,255,0.18);
       background:rgba(255,255,255,0.07); color:rgba(255,255,255,0.7);
-      font-size:0.71rem; font-weight:700; cursor:pointer; transition:all var(--trans);
+      font-size:0.62rem; font-weight:700; cursor:pointer; transition:all var(--trans);
       font-family:'Roboto',sans-serif;
     }
     .source-btn:hover, .source-btn.active { background:var(--accent); color:#000; border-color:var(--accent); }
@@ -2265,6 +2265,7 @@
     .server-btn { padding:8px 16px; border-radius:var(--radius); background:var(--surface2); border:1px solid var(--border); color:var(--text-dim); font-size:0.8rem; font-weight:600; transition:var(--trans); cursor:pointer; }
     .server-btn:hover { border-color:var(--accent); color:var(--text); }
     .server-btn.active { background:var(--accent); border-color:transparent; color:var(--bg); }
+
   </style>
 </head>
 <body>
@@ -3444,6 +3445,7 @@
 
   <div class="player-frame-wrap">
     <div id="playerClickOverlay"></div>
+    <!-- Reproductor móvil estilo Netflix -->
     <div class="player-hidden-hint">▶</div>
     <!-- Barra de progreso para video nativo (HLS/.m3u8) -->
     <div id="playerProgressBar"><div id="playerProgressFill"></div></div>
@@ -3456,7 +3458,7 @@
         El servidor obtiene el contenido en tiempo real.<br>Puede tardar hasta 15 segundos.
       </p>
     </div>
-    <iframe id="playerFrame" tabindex="0" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope" referrerpolicy="origin" style="width:100%;height:100%;border:none;position:absolute;inset:0;will-change:transform;transform:translateZ(0)"></iframe>
+    <iframe id="playerFrame" tabindex="0" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope" referrerpolicy="no-referrer" style="width:100%;height:100%;border:none;position:absolute;inset:0;will-change:transform;transform:translateZ(0)"></iframe>
     <video id="playerVideo" controls autoplay style="display:none;"></video>
   </div>
   <!-- Botón rápido "Siguiente Ep" siempre disponible en series -->
@@ -3756,32 +3758,32 @@
   };
 
   // ================================================================
-  // FUENTES — Solo StreanMix (UnlimPlay)
+  // FUENTES — extraídas del APK original Streamix 3.4
   // ================================================================
   const SOURCES = [
     {
-      name:'UnlimPlay',
-      icon:'🎬',
-      movie: id => `https://unlimplay.com/play/embed/movie/${id}`,
-      tv:  (id,s,e) => `https://unlimplay.com/play/embed/tv/${id}/${s}/${e}`
-    },
-    {
       name:'VidSrc',
       icon:'▶',
-      movie: id => `https://vidsrc.fyi/embed/movie/${id}`,
-      tv:  (id,s,e) => `https://vidsrc.fyi/embed/tv/${id}/${s}/${e}`
+      movie: id => `https://vidsrc.to/embed/movie/${id}?autoplay=1&sub_lang=es`,
+      tv:  (id,s,e) => `https://vidsrc.to/embed/tv/${id}/${s}/${e}?autoplay=1&sub_lang=es`
     },
     {
-      name:'EmbedSu',
-      icon:'📺',
-      movie: id => `https://embed.su/embed/movie/${id}`,
-      tv:  (id,s,e) => `https://embed.su/embed/tv/${id}/${s}/${e}`
+      name:'VidSrc.me',
+      icon:'▶',
+      movie: id => `https://vidsrc.me/embed/movie?tmdb=${id}&autoplay=1&sub_lang=es&lang=es`,
+      tv:  (id,s,e) => `https://vidsrc.me/embed/tv?tmdb=${id}&season=${s}&episode=${e}&autoplay=1&sub_lang=es&lang=es`
     },
     {
-      name:'2Embed',
-      icon:'🔄',
-      movie: id => `https://www.2embed.cc/embed/${id}`,
-      tv:  (id,s,e) => `https://www.2embed.cc/embedtv/${id}&s=${s}&e=${e}`
+      name:'FileMoon',
+      icon:'▶',
+      movie: id => `https://filemoon.sx/e/${id}?autoplay=1`,
+      tv:  (id,s,e) => `https://filemoon.sx/e/${id}/${s}/${e}?autoplay=1`
+    },
+    {
+      name:'UnlimPlay',
+      icon:'▶',
+      movie: id => `https://unlimplay.com/play/embed/movie/${id}`,
+      tv:  (id,s,e) => `https://unlimplay.com/play/embed/tv/${id}/${s}/${e}`
     }
   ];
 
@@ -4319,8 +4321,6 @@
         e.stopPropagation();
         showControls();
       });
-      // Cuando controles ocultos el overlay tiene pointer-events:auto y captura el cursor
-      // Esto activa showControls() al mover el Magic Remote sobre el área de video
       overlay.addEventListener('mousemove', showControls);
       overlay.addEventListener('pointermove', showControls);
     }
@@ -5802,7 +5802,7 @@
       const frame = document.getElementById('playerFrame');
       if(!frame || frame.src || frame._preheating) return;
       frame._preheating = true;
-      frame.src = 'https://unlimplay.com';
+      frame.src = 'https://stream-vault-two-phi.vercel.app';
       setTimeout(()=>{ if(frame._preheating){frame.src='';frame._preheating=false;} }, 5000);
     } catch(e){}
   }
@@ -6122,8 +6122,10 @@
       // source anime1v ya no existe — animes usan UnlimPlay + API en paralelo
     }
 
-    // Índice de fuente activa (0 = UnlimPlay por defecto)
-    var _activeSrcIdx = (typeof playerState._srcIdx === 'number') ? playerState._srcIdx : 0;
+    // TV → UnlimPlay (idx 3), móvil → VidSrc.me (idx 1), desktop → VidSrc (idx 0)
+    var _defaultSrcIdx = document.documentElement.classList.contains('tv-mode') ? 3
+                       : document.documentElement.classList.contains('mobile-mode') ? 1 : 0;
+    var _activeSrcIdx = (typeof playerState._srcIdx === 'number') ? playerState._srcIdx : _defaultSrcIdx;
     playerState._srcIdx = _activeSrcIdx;
 
     function _buildSrcUrl(idx){
