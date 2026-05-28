@@ -6248,11 +6248,11 @@
     if(!_dpIsAnime || playerState.type !== 'tv'){
       const sel = document.getElementById('sourceSelector');
       sel.style.display = 'flex';
-      const rdBtn = RD_TOKEN ? `<button class="source-btn${_activeSrcIdx===RD_SRC_IDX?' active':''}"
+      const rdBtn = `<button class="source-btn${_activeSrcIdx===RD_SRC_IDX?' active':''}"
            onclick="switchSource(${RD_SRC_IDX})" title="Real-Debrid — streams HD, sin anuncios"
            style="font-size:0.7rem;padding:3px 9px;">
            ⚡ RD
-         </button>` : '';
+         </button>`;
       const svBtn = `<button class="source-btn${_activeSrcIdx===SV_SRC_IDX?' active':''}"
            onclick="switchSource(${SV_SRC_IDX})" title="StreamVault API — 11 proveedores, sin anuncios"
            style="font-size:0.7rem;padding:3px 9px;">
