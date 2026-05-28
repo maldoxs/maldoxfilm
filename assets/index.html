@@ -3825,7 +3825,7 @@
       // Obtener IMDB ID desde TMDB
       const tmdbType = type === 'tv' ? 'tv' : 'movie';
       const extUrl = 'https://api.themoviedb.org/3/' + tmdbType + '/' + tmdbId
-        + '/external_ids?api_key=4ef0d1468d0f359e0b45f26694f42054';
+        + '/external_ids?api_key=' + TMDB_KEY;
       const extData = await fetch(extUrl).then(r => r.json());
       const imdbId = extData.imdb_id;
       if(!imdbId) return {url:null};
@@ -6230,7 +6230,7 @@
       // source anime1v ya no existe — animes usan UnlimPlay + API en paralelo
     }
 
-    var _defaultSrcIdx = RD_TOKEN ? RD_SRC_IDX : SV_SRC_IDX;
+    var _defaultSrcIdx = SV_SRC_IDX; // SV por defecto; RD disponible manualmente
     var _activeSrcIdx = (typeof playerState._srcIdx === 'number') ? playerState._srcIdx : _defaultSrcIdx;
     playerState._srcIdx = _activeSrcIdx;
 
@@ -6317,22 +6317,15 @@
               _safePlay(video);
               hideLoadingAndStart();
             } catch(e){
-              loadingText.textContent = '❌ Error al reproducir. Elige otra fuente.';
+              // Shaka falló (CORS, codec, etc.) — fallback automático a VidSrc
+              _clearMsgTimers();
+              showToast('🌐 SV no disponible — usando VidSrc');
+              _shakaDestroy();
+              video.style.display = 'none';
+              playerState._srcIdx = 0;
+              loadPlayerSource();
             }
           });
-          /* hls.js comentado — usar Shaka
-          if(streamUrl.includes('.m3u8')){
-            loadHlsIfNeeded(function(){
-              if(window.Hls && window.Hls.isSupported()){
-                const hls = new window.Hls(); window.hlsInstance = hls;
-                hls.loadSource(streamUrl); hls.attachMedia(video);
-                hls.on(window.Hls.Events.MANIFEST_PARSED, ()=>{ _safePlay(video); hideLoadingAndStart(); });
-                hls.on(window.Hls.Events.ERROR, (e,d)=>{ if(d.fatal) loadingText.textContent='❌ Error al reproducir'; });
-              }
-            });
-          } else {
-            video.src = streamUrl; _safePlay(video); hideLoadingAndStart();
-          } */
         })
         .catch(()=>{
           _clearMsgTimers();
@@ -6372,11 +6365,15 @@
               _safePlay(video);
               hideLoadingAndStart();
             } catch(e){
-              loadingText.textContent = '❌ Error al reproducir. Elige otra fuente.';
+              // Shaka falló en RD — fallback a SV
+              _clearMsgTimers();
+              showToast('⚡ RD no disponible — usando 🌐 SV');
+              _shakaDestroy();
+              video.style.display = 'none';
+              playerState._srcIdx = SV_SRC_IDX;
+              loadPlayerSource();
             }
           });
-          /* hls.js comentado
-          if(streamUrl.includes('.m3u8')){ loadHlsIfNeeded(...) } else { video.src=streamUrl; } */
         })
         .catch(()=>{
           _clearMsgTimers();
