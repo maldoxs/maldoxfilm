@@ -1210,10 +1210,17 @@
       z-index: 9999 !important;
       background: #000 !important;
     }
-    /* Ocultar controles al entrar en fullscreen para que el reproductor tenga toda la pantalla */
+    /* En fullscreen: mantener topbar visible pero semitransparente y oculto hasta hover/tap */
     #playerPage:fullscreen .player-topbar,
     #playerPage:-webkit-full-screen .player-topbar {
-      display: none !important;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #playerPage:fullscreen .player-page:not(.controls-hidden) .player-topbar,
+    #playerPage:-webkit-full-screen .player-page:not(.controls-hidden) .player-topbar,
+    #playerPage:fullscreen:not(.controls-hidden) .player-topbar,
+    #playerPage:-webkit-full-screen:not(.controls-hidden) .player-topbar {
+      opacity: 1 !important;
     }
 
 
@@ -3818,35 +3825,27 @@
     } catch(e){ return {url:null}; }
   }
 
-  // ── REAL-DEBRID via Torrentio — prefiere AAC, evita AC3/DTS incompatibles con Chrome ──
+  // ── REAL-DEBRID via Torrentio ──
   async function rdGetStream(tmdbId, type, season, episode){
     if(!RD_TOKEN) return {url:null};
     try {
-      // Obtener IMDB ID desde TMDB
       const tmdbType = type === 'tv' ? 'tv' : 'movie';
-      const extUrl = 'https://api.themoviedb.org/3/' + tmdbType + '/' + tmdbId
-        + '/external_ids?api_key=' + TMDB_KEY;
-      const extData = await fetch(extUrl).then(r => r.json());
-      const imdbId = extData.imdb_id;
+      const ext = await fetch('https://api.themoviedb.org/3/' + tmdbType + '/' + tmdbId
+        + '/external_ids?api_key=' + TMDB_KEY).then(r => r.json());
+      const imdbId = ext.imdb_id;
       if(!imdbId) return {url:null};
 
-      // Torrentio con Real-Debrid
-      var tPath = type === 'tv'
+      const tPath = type === 'tv'
         ? '/stream/series/' + imdbId + ':' + season + ':' + episode + '.json'
         : '/stream/movie/' + imdbId + '.json';
-      var tUrl = 'https://torrentio.strem.fun/realdebrid=' + RD_TOKEN + '|qualityfilter=other,scr,cam' + tPath;
+      const tUrl = 'https://torrentio.strem.fun/realdebrid=' + RD_TOKEN + tPath;
       const tData = await fetch(tUrl).then(r => r.json());
       if(!tData.streams || !tData.streams.length) return {url:null};
 
-      // Seleccionar: RD+AAC > AAC > RD > primero
+      // Preferir streams con URL directa (cacheados en RD)
       const ss = tData.streams;
-      const info = s => ((s.title||'') + (s.name||'') + (s.behaviorHints && s.behaviorHints.filename ? s.behaviorHints.filename : '')).toLowerCase();
-      const hasAAC = s => /\baac\b/.test(info(s));
-      const hasRD  = s => /\brd\b|\[rd\]/.test(info(s)) || (s.name||'').toUpperCase().includes('RD');
-      const best = ss.find(s => hasRD(s) && hasAAC(s))
-                || ss.find(s => hasAAC(s))
-                || ss.find(s => hasRD(s))
-                || ss[0];
+      const withUrl = ss.filter(s => s.url);
+      const best = withUrl[0] || ss[0];
       return { url: best && best.url ? best.url : null };
     } catch(e){ return {url:null}; }
   }
@@ -3854,25 +3853,8 @@
   // ================================================================
   // FUENTES — extraídas del APK original Streamix 3.4
   // ================================================================
+  // Orden de fallback iframe: UnlimPlay(0) → VidSrc(1)
   const SOURCES = [
-    {
-      name:'VidSrc',
-      icon:'▶',
-      movie: id => `https://vidsrc.to/embed/movie/${id}?autoplay=1`,
-      tv:  (id,s,e) => `https://vidsrc.to/embed/tv/${id}/${s}/${e}?autoplay=1`
-    },
-    {
-      name:'VidSrc.me',
-      icon:'▶',
-      movie: id => `https://vidsrc.me/embed/movie?tmdb=${id}&autoplay=1`,
-      tv:  (id,s,e) => `https://vidsrc.me/embed/tv?tmdb=${id}&season=${s}&episode=${e}&autoplay=1`
-    },
-    {
-      name:'FileMoon',
-      icon:'▶',
-      movie: id => `https://filemoon.sx/e/${id}?autoplay=1`,
-      tv:  (id,s,e) => `https://filemoon.sx/e/${id}/${s}/${e}?autoplay=1`
-    },
     {
       name:'UnlimPlay',
       icon:'▶',
@@ -3880,16 +3862,10 @@
       tv:  (id,s,e) => `https://unlimplay.com/play/embed/tv/${id}/${s}/${e}`
     },
     {
-      name:'VidAPI',
+      name:'VidSrc',
       icon:'▶',
-      movie: id => `https://vidapi.xyz/embed/movie/${id}`,
-      tv:  (id,s,e) => `https://vidapi.xyz/embed/tv/${id}/${s}/${e}`
-    },
-    {
-      name:'StreamVault',
-      icon:'🌐',
-      movie: id => SV_BASE + '/embed/movie/' + id,
-      tv:  (id,s,e) => SV_BASE + '/embed/tv/' + id + '?season=' + s + '&episode=' + e
+      movie: id => `https://vidsrc.to/embed/movie/${id}?autoplay=1`,
+      tv:  (id,s,e) => `https://vidsrc.to/embed/tv/${id}/${s}/${e}?autoplay=1`
     }
   ];
 
@@ -6230,7 +6206,7 @@
       // source anime1v ya no existe — animes usan UnlimPlay + API en paralelo
     }
 
-    var _defaultSrcIdx = SV_SRC_IDX; // SV por defecto; RD disponible manualmente
+    var _defaultSrcIdx = RD_SRC_IDX; // Orden: RD → SV → UnlimPlay → VidSrc
     var _activeSrcIdx = (typeof playerState._srcIdx === 'number') ? playerState._srcIdx : _defaultSrcIdx;
     playerState._srcIdx = _activeSrcIdx;
 
@@ -6250,17 +6226,20 @@
       sel.style.display = 'flex';
       const rdBtn = `<button class="source-btn${_activeSrcIdx===RD_SRC_IDX?' active':''}"
            onclick="switchSource(${RD_SRC_IDX})" title="Real-Debrid — streams HD, sin anuncios"
+           data-src-idx="${RD_SRC_IDX}"
            style="font-size:0.7rem;padding:3px 9px;">
            ⚡ RD
          </button>`;
       const svBtn = `<button class="source-btn${_activeSrcIdx===SV_SRC_IDX?' active':''}"
            onclick="switchSource(${SV_SRC_IDX})" title="StreamVault API — 11 proveedores, sin anuncios"
+           data-src-idx="${SV_SRC_IDX}"
            style="font-size:0.7rem;padding:3px 9px;">
            🌐 SV
          </button>`;
       sel.innerHTML = rdBtn + svBtn + SOURCES.map((s,i)=>
         `<button class="source-btn${i===_activeSrcIdx?' active':''}"
            onclick="switchSource(${i})"
+           data-src-idx="${i}"
            title="${s.name}"
            style="font-size:0.7rem;padding:3px 9px;">
            ${s.icon} ${s.name}
@@ -6302,7 +6281,7 @@
         .then(({url: streamUrl}) => {
           _clearMsgTimers();
           if(!streamUrl){
-            showToast('🌐 Sin resultados en SV — usando VidSrc');
+            showToast('🌐 SV sin resultados — usando UnlimPlay');
             playerState._srcIdx = 0;
             loadPlayerSource();
             return;
@@ -6319,7 +6298,7 @@
             } catch(e){
               // Shaka falló (CORS, codec, etc.) — fallback automático a VidSrc
               _clearMsgTimers();
-              showToast('🌐 SV no disponible — usando VidSrc');
+              showToast('🌐 SV no disponible — usando UnlimPlay');
               _shakaDestroy();
               video.style.display = 'none';
               playerState._srcIdx = 0;
@@ -6329,59 +6308,113 @@
         })
         .catch(()=>{
           _clearMsgTimers();
-          showToast('🌐 Error con SV — usando VidSrc');
+          showToast('🌐 Error con SV — usando UnlimPlay');
           playerState._srcIdx = 0;
           loadPlayerSource();
         });
       return;
     }
 
-    // ── REAL-DEBRID — resolución async via Torrentio ──
+    // ── REAL-DEBRID — Torrentio + transcoding x265/HEVC → H.264 HLS via RD API ──
     if(_activeSrcIdx === RD_SRC_IDX){
       rdGetStream(playerState.id, playerState.type, playerState.season, playerState.episode)
-        .then(({url: streamUrl}) => {
+        .then(async ({url: streamUrl}) => {
           _clearMsgTimers();
           if(!streamUrl){
-            showToast('⚡ Sin resultados en RD — usando VidSrc.me');
-            playerState._srcIdx = 1;
+            showToast('⚡ RD sin resultados — usando 🌐 SV');
+            playerState._srcIdx = SV_SRC_IDX;
             loadPlayerSource();
             return;
           }
+
+          // ── Transcoding RD: convierte x265/HEVC → H.264 HLS compatible con Chrome ──
+          // URL CDN de RD: https://cdnXX.real-debrid.com/dl/ID/archivo.mkv
+          let hlsUrl = null;
+          try {
+            const rdId = streamUrl.match(/\/dl\/([^/]+)\//)?.[1];
+            if(rdId){
+              const tcData = await fetch(
+                'https://api.real-debrid.com/rest/1.0/streaming/transcode/' + rdId,
+                { headers: { 'Authorization': 'Bearer ' + RD_TOKEN } }
+              ).then(r => r.json());
+              // Preferir HLS (apple) > dash > h264
+              hlsUrl = (tcData.apple && tcData.apple.full)
+                    || (tcData.dash  && tcData.dash.full)
+                    || (tcData.h264  && tcData.h264.full)
+                    || null;
+            }
+          } catch(e){ hlsUrl = null; }
+
           frame.style.display = 'none';
           video.style.display = 'block';
           video.controls = true;
-          // ── Shaka Player + detección DMCA ──
-          loadShakaIfNeeded(async function(){
-            try {
-              await _shakaLoad(video, streamUrl);
-              // DMCA: RD reemplaza archivos removidos con clip de ~30s
-              if(video.duration && video.duration <= 35){
+
+          if(hlsUrl){
+            // ── HLS transcoded: reproducir con HLS.js ──
+            if(window.hlsInstance){ window.hlsInstance.destroy(); window.hlsInstance = null; }
+            loadHlsIfNeeded(function(){
+              if(window.Hls && window.Hls.isSupported()){
+                const hls = new window.Hls();
+                window.hlsInstance = hls;
+                hls.loadSource(hlsUrl);
+                hls.attachMedia(video);
+                hls.on(window.Hls.Events.MANIFEST_PARSED, function(){
+                  _safePlay(video);
+                  hideLoadingAndStart();
+                });
+                hls.on(window.Hls.Events.ERROR, function(ev, data){
+                  if(data.fatal){
+                    hls.destroy(); window.hlsInstance = null;
+                    // Fallback a directo
+                    video.src = streamUrl; video.load();
+                    video.addEventListener('loadedmetadata', function(){
+                      _safePlay(video); hideLoadingAndStart();
+                    }, { once: true });
+                  }
+                });
+              } else if(video.canPlayType('application/vnd.apple.mpegurl')){
+                // Safari: HLS nativo
+                video.src = hlsUrl;
+                video.addEventListener('loadedmetadata', function(){
+                  _safePlay(video); hideLoadingAndStart();
+                }, { once: true });
+              } else {
+                // Fallback a directo
+                video.src = streamUrl; video.load();
+                video.addEventListener('loadedmetadata', function(){
+                  if(video.duration && isFinite(video.duration) && video.duration <= 35){
+                    showToast('⚡ RD: archivo eliminado — cambiando a 🌐 SV');
+                    video.src = ''; playerState._srcIdx = SV_SRC_IDX; loadPlayerSource(); return;
+                  }
+                  _safePlay(video); hideLoadingAndStart();
+                }, { once: true });
+              }
+            });
+          } else {
+            // ── Sin transcoding: directo (funciona para H.264, falla en x265) ──
+            video.src = streamUrl;
+            video.load();
+            video.addEventListener('loadedmetadata', function(){
+              if(video.duration && isFinite(video.duration) && video.duration <= 35){
                 showToast('⚡ RD: archivo eliminado — cambiando a 🌐 SV');
-                _shakaDestroy();
-                playerState._srcIdx = SV_SRC_IDX;
-                loadPlayerSource();
-                return;
+                video.src = ''; playerState._srcIdx = SV_SRC_IDX; loadPlayerSource(); return;
               }
               _safePlay(video);
               hideLoadingAndStart();
-            } catch(e){
-              // Shaka falló en RD — fallback a SV
-              _clearMsgTimers();
-              showToast('⚡ RD no disponible — usando 🌐 SV');
-              _shakaDestroy();
-              video.style.display = 'none';
-              playerState._srcIdx = SV_SRC_IDX;
-              loadPlayerSource();
-            }
-          });
+            }, { once: true });
+            video.addEventListener('error', function(){
+              showToast('⚡ RD: error de codec — usando 🌐 SV');
+              video.src = ''; playerState._srcIdx = SV_SRC_IDX; loadPlayerSource();
+            }, { once: true });
+          }
         })
         .catch(()=>{
           _clearMsgTimers();
-          showToast('⚡ Error con RD — usando VidSrc.me');
-          playerState._srcIdx = 1;
+          showToast('⚡ Error con RD — usando 🌐 SV');
+          playerState._srcIdx = SV_SRC_IDX;
           loadPlayerSource();
         });
-      return; // No ejecutar el bloque normal de iframe
+      return;
     }
 
     // Sin delay — la preconexión ya fue hecha en openModal
@@ -6417,10 +6450,10 @@
           clearTimeout(_autoFallbackTimer);
           const srcUrl = _buildSrcUrl(srcIdx);
 
-          // Actualizar botones activos en el selector
+          // Actualizar botón activo por data-src-idx (no por posición DOM)
           const sel = document.getElementById('sourceSelector');
-          if(sel) sel.querySelectorAll('.source-btn').forEach((b,i)=>
-            b.classList.toggle('active', i===srcIdx));
+          if(sel) sel.querySelectorAll('.source-btn').forEach(b=>
+            b.classList.toggle('active', parseInt(b.dataset.srcIdx)===srcIdx));
 
           loadingText.textContent = srcIdx === 0
             ? '🔌 Conectando con el servidor...'
@@ -6745,6 +6778,8 @@
   });
 
   function triggerNextEpisode(){ cancelAutoNext(); goToNextEpisode(); }
+
+
 
   // Cambiar fuente manualmente desde los botones del topbar
   function switchSource(idx){
