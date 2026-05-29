@@ -8,6 +8,7 @@
 
 | Archivo | Qué explica |
 |---|---|
+| [ESQUEMA_GENERAL.md](ESQUEMA_GENERAL.md) | Diagrama completo de todo el sistema de punta a punta |
 | [FLUJO_COMPLETO_HOLLYWOOD_A_MALDOXFILM.md](FLUJO_COMPLETO_HOLLYWOOD_A_MALDOXFILM.md) | El proceso entero: de Hollywood al reproductor, con diagrama |
 | [IMDB_TMDB_EXPLICADO.md](IMDB_TMDB_EXPLICADO.md) | Qué son IMDB y TMDB, cómo funcionan sus IDs y por qué los usamos |
 | [TORRENTS_Y_TORRENTIO_EXPLICADO.md](TORRENTS_Y_TORRENTIO_EXPLICADO.md) | Qué es un torrent, cómo funciona Torrentio y cómo RD tiene los archivos listos |
@@ -22,10 +23,12 @@
 ## Orden recomendado de lectura
 
 ```
+0. ESQUEMA_GENERAL                        →  Diagrama visual de todo el sistema
 1. FLUJO_COMPLETO_HOLLYWOOD_A_MALDOXFILM  →  El panorama general completo
 2. IMDB_TMDB_EXPLICADO                   →  ¿Cómo se identifica una película?
 3. TORRENTS_Y_TORRENTIO_EXPLICADO        →  ¿Qué es un torrent y cómo lo encuentra Torrentio?
-4. FLUJO_RD_TORRENTIO                    →  Detalle técnico del flujo RD + Torrentio
-5. X265_EXPLICADO                        →  ¿Por qué falla x265 en Chrome y cómo se resuelve?
-6. ENDPOINTS                             →  Referencia técnica de todas las APIs
+4. SELECCION_MEJOR_STREAM                →  ¿Cómo elige MaldoxFilm la mejor versión?
+5. FLUJO_RD_TORRENTIO                    →  Detalle técnico del flujo RD + Torrentio
+6. X265_EXPLICADO                        →  ¿Por qué falla x265 en Chrome y cómo se resuelve?
+7. ENDPOINTS                             →  Referencia técnica de todas las APIs
 ```
