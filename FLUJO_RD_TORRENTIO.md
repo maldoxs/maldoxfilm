@@ -132,3 +132,41 @@ Sin el token, Torrentio solo mostraría torrents que habría que descargar (lent
    ↓ si falla
 ▶ VidSrc
 ```
+
+---
+
+## Errores conocidos y resueltos
+
+### ❌ `_safePlay is not defined` — Mayo 2026
+
+**Síntoma:** El reproductor RD se quedaba colgado en pantalla negra. El video nunca arrancaba. En consola aparecía:
+```
+Uncaught ReferenceError: _safePlay is not defined
+    at video.addEventListener.once (índice):6456
+```
+
+**Causa:** En el bloque de reproducción RD se usaba `_safePlay(video)` para iniciar el video, pero esa función **nunca existió** en el código. Se introdujo como nombre de función en una sesión de desarrollo sin llegar a definirla.
+
+**Fix:** Reemplazar todas las llamadas `_safePlay(video)` por `video.play().catch(()=>{})` directamente.
+
+```javascript
+// ❌ Mal — función inexistente
+_safePlay(video);
+
+// ✅ Bien — nativo del browser
+video.play().catch(()=>{});
+```
+
+**Afectaba a:** Reproducción directa H.264, HLS.js (manifest parsed), Apple HLS nativo, y Shaka Player (SV).
+
+---
+
+### ℹ️ Nota: URL proxy de Torrentio
+
+Torrentio no siempre devuelve una URL CDN directa. A veces devuelve una URL proxy propia:
+```
+https://torrentio.strem.fun/resolve/realdebrid/TOKEN/HASH/filename.mp4
+```
+El navegador **sí puede seguir ese redirect** automáticamente al hacer `video.src = url`. No hace falta resolverla manualmente para reproducir H.264.
+
+Para x265 (que necesita transcode), sí es necesario resolver la URL para obtener el ID real del download en `/rest/1.0/downloads`.
