@@ -3925,8 +3925,8 @@
     {
       name:'VidSrc',
       icon:'▶',
-      movie: id => `https://vidsrc.to/embed/movie/${id}?autoplay=1`,
-      tv:  (id,s,e) => `https://vidsrc.to/embed/tv/${id}/${s}/${e}?autoplay=1`
+      movie: id => `https://vidsrc-embed.ru/embed/movie?tmdb=${id}&autoplay=1`,
+      tv:  (id,s,e) => `https://vidsrc-embed.ru/embed/tv?tmdb=${id}&season=${s}&episode=${e}&autoplay=1`
     }
   ];
 
