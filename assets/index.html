@@ -4105,6 +4105,7 @@
   let currentTab='movies', heroItems=[], heroIndex=0, heroInterval=null;
   let playerState={id:null,type:'movie',season:1,episode:1,totalSeasons:0,totalEpisodes:0,title:'',runtimeMin:0};
   let autoNextTimer=null, autoNextInterval=null, runtimeFetchPromise=null, controlsHideTimeout;
+  let _iframeAutoFallbackTimer = null;   // timer global para poder cancelarlo en loadPlayerSource
   let animeLoaded=false, currentAnimeGenre=0;
   let progressInterval=null, playerStartTime=0;
   let autoNextPollInterval=null, autoNextTriggered=false, autoNextEpisodeData=null;
@@ -6252,6 +6253,7 @@
 
     loading.classList.remove('hidden');
     cancelAutoNext();
+    clearTimeout(_iframeAutoFallbackTimer); _iframeAutoFallbackTimer = null; // cancelar timer iframe stale
     clearInterval(progressInterval);
     if(window.hlsInstance){window.hlsInstance.destroy();window.hlsInstance=null;}
     _shakaDestroy();
@@ -6260,6 +6262,7 @@
     video.style.display='none'; video.pause(); video.src='';
     video.muted = false; video.volume = 1;  // Resetear siempre al abrir
     frame.onload = null; frame.onerror = null;
+    frame.src = 'about:blank'; // limpiar cache del iframe anterior
     
     let url = '';
 
@@ -6564,11 +6567,10 @@
         });
       } else {
         let onloadFired = false;
-        var _autoFallbackTimer = null;
 
         function _loadSource(srcIdx){
           onloadFired = false;
-          clearTimeout(_autoFallbackTimer);
+          clearTimeout(_iframeAutoFallbackTimer); _iframeAutoFallbackTimer = null;
           const srcUrl = _buildSrcUrl(srcIdx);
 
           // Actualizar botón activo por data-src-idx (no por posición DOM)
@@ -6576,36 +6578,40 @@
           if(sel) sel.querySelectorAll('.source-btn').forEach(b=>
             b.classList.toggle('active', parseInt(b.dataset.srcIdx)===srcIdx));
 
+          // Sincronizar playerState con el fuente que se está cargando
+          playerState._srcIdx = srcIdx;
+
           loadingText.textContent = srcIdx === 0
             ? '🔌 Conectando con el servidor...'
-            : `🔄 Probando ${SOURCES[srcIdx].name}...`;
+            : `🔄 Probando ${SOURCES[srcIdx] ? SOURCES[srcIdx].name : 'siguiente fuente'}...`;
 
           frame.onload = ()=>{
             if(onloadFired) return;
             onloadFired = true;
+            clearTimeout(_iframeAutoFallbackTimer); _iframeAutoFallbackTimer = null;
             setTimeout(hideLoadingAndStart, isTV ? 600 : 0);
           };
 
           frame.style.display = 'block';
-          frame.src = srcUrl;
+          frame.src = 'about:blank'; // limpiar antes de cargar nueva fuente (evita cache)
+          // pequeño tick para que el navegador registre el cambio a blank antes del nuevo src
+          setTimeout(()=>{ frame.src = srcUrl; }, 50);
 
           // Fuente 0 (UnlimPlay) tarda ~15s en scraping; las demás son más rápidas
           const timeoutMs = srcIdx === 0
             ? (isTV ? 22000 : 16000)
             : (isTV ? 14000 : 10000);
 
-          _autoFallbackTimer = setTimeout(()=>{
+          _iframeAutoFallbackTimer = setTimeout(()=>{
             _clearMsgTimers();
             if(!onloadFired){
               // Intentar siguiente fuente automáticamente
               const nextIdx = srcIdx + 1;
               if(nextIdx < SOURCES.length){
-                playerState._srcIdx = nextIdx;
-                _activeSrcIdx = nextIdx;
                 _loadSource(nextIdx);
                 return;
               }
-              // Sin más fuentes — mostrar de todas formas
+              // Sin más fuentes — mostrar de todas formas lo que hay
               onloadFired = true;
               playerStartTime = Date.now();
               startProgressTracking();
