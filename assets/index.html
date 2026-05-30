@@ -4106,6 +4106,7 @@
   let playerState={id:null,type:'movie',season:1,episode:1,totalSeasons:0,totalEpisodes:0,title:'',runtimeMin:0};
   let autoNextTimer=null, autoNextInterval=null, runtimeFetchPromise=null, controlsHideTimeout;
   let _iframeAutoFallbackTimer = null;   // timer global para poder cancelarlo en loadPlayerSource
+  let _playerGen = 0;  // generation counter — cada loadPlayerSource() lo incrementa para cancelar callbacks async obsoletos
   let animeLoaded=false, currentAnimeGenre=0;
   let progressInterval=null, playerStartTime=0;
   let autoNextPollInterval=null, autoNextTriggered=false, autoNextEpisodeData=null;
@@ -6252,6 +6253,7 @@
     if(frame._preheating){ frame._preheating=false; }
 
     loading.classList.remove('hidden');
+    const _myGen = ++_playerGen; // incrementar generación — invalida todos los callbacks async anteriores
     cancelAutoNext();
     clearTimeout(_iframeAutoFallbackTimer); _iframeAutoFallbackTimer = null; // cancelar timer iframe stale
     clearInterval(progressInterval);
@@ -6343,6 +6345,7 @@
     if(_activeSrcIdx === SV_SRC_IDX){
       svGetStream(playerState.id, playerState.type, playerState.season, playerState.episode)
         .then(({url: streamUrl}) => {
+          if(_playerGen !== _myGen) return; // usuario cambió de fuente — ignorar este resultado
           _clearMsgTimers();
           if(!streamUrl){
             showToast('🌐 SV sin resultados — usando UnlimPlay');
@@ -6355,11 +6358,14 @@
           video.controls = true;
           // ── Shaka Player (reemplaza hls.js) ──
           loadShakaIfNeeded(async function(){
+            if(_playerGen !== _myGen) return;
             try {
               await _shakaLoad(video, streamUrl);
+              if(_playerGen !== _myGen) return;
               video.play().catch(()=>{});
               hideLoadingAndStart();
             } catch(e){
+              if(_playerGen !== _myGen) return;
               // Shaka falló (CORS, codec, etc.) — fallback automático a VidSrc
               _clearMsgTimers();
               showToast('🌐 SV no disponible — usando UnlimPlay');
@@ -6371,6 +6377,7 @@
           });
         })
         .catch(()=>{
+          if(_playerGen !== _myGen) return;
           _clearMsgTimers();
           showToast('🌐 Error con SV — usando UnlimPlay');
           playerState._srcIdx = 0;
@@ -6383,6 +6390,7 @@
     if(_activeSrcIdx === RD_SRC_IDX){
       rdGetStream(playerState.id, playerState.type, playerState.season, playerState.episode)
         .then(async ({url: streamUrl, rdId, isX265: streamIsX265, fallbackUrl}) => {
+          if(_playerGen !== _myGen) return; // usuario cambió de fuente — ignorar este resultado
           _clearMsgTimers();
           if(!streamUrl){
             showToast('⚡ Sin resultados en RD — usando 🌐 SV');
@@ -6534,6 +6542,7 @@
           }
         })
         .catch(()=>{
+          if(_playerGen !== _myGen) return;
           _clearMsgTimers();
           showToast('⚡ Error con RD — usando 🌐 SV');
           playerState._srcIdx = SV_SRC_IDX; loadPlayerSource();
