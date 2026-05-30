@@ -3849,14 +3849,26 @@
       const hasAAC  = s => /\baac\b/.test(info(s));
       const hasH264 = s => /\bh\.?264\b|\bx264\b/.test(info(s));
       const hasRD   = s => /\brd\b|\[rd\]/.test(info(s)) || (s.name||'').toUpperCase().includes('RD');
+      const isX265  = s => /\bx265\b|\bhevc\b|\bh\.?265\b/i.test(info(s));
       const withUrl = ss.filter(s => s.url);
-      // Preferencia: RD+H264 > RD+AAC > H264 > RD > cualquiera con URL
+      // Preferencia: RD+H264 > RD+AAC(no x265) > H264 > RD(no x265) > RD(x265 último recurso) > cualquiera
       const best = withUrl.find(s => hasRD(s) && hasH264(s))
-                || withUrl.find(s => hasRD(s) && hasAAC(s))
+                || withUrl.find(s => hasRD(s) && hasAAC(s) && !isX265(s))
                 || withUrl.find(s => hasH264(s))
+                || withUrl.find(s => hasRD(s) && !isX265(s))
                 || withUrl.find(s => hasRD(s))
                 || withUrl[0] || ss[0];
       if(!best || !best.url) return {url:null, rdId:null};
+
+      // Plan B: si el mejor disponible es x265, guardar alternativa sin x265
+      let fallbackUrl = null;
+      if(isX265(best)){
+        const altBest = withUrl.find(s => s !== best && hasRD(s) && hasH264(s))
+                     || withUrl.find(s => s !== best && hasH264(s))
+                     || withUrl.find(s => s !== best && hasRD(s) && !isX265(s))
+                     || withUrl.find(s => s !== best && !isX265(s));
+        if(altBest && altBest.url) fallbackUrl = altBest.url;
+      }
 
       // 3. Filename del stream
       const streamFilename = (best.behaviorHints && best.behaviorHints.filename)
@@ -3895,8 +3907,8 @@
         }
       } catch(e){ rdId = null; }
 
-      return { url: resolvedUrl !== best.url ? resolvedUrl : best.url, rdId };
-    } catch(e){ return {url:null, rdId:null}; }
+      return { url: resolvedUrl !== best.url ? resolvedUrl : best.url, rdId, isX265: isX265(best), fallbackUrl };
+    } catch(e){ return {url:null, rdId:null, isX265: false, fallbackUrl: null}; }
   }
 
   // ================================================================
@@ -6367,7 +6379,7 @@
     // ── REAL-DEBRID ──────────────────────────────────────────────────────────
     if(_activeSrcIdx === RD_SRC_IDX){
       rdGetStream(playerState.id, playerState.type, playerState.season, playerState.episode)
-        .then(async ({url: streamUrl, rdId}) => {
+        .then(async ({url: streamUrl, rdId, isX265: streamIsX265, fallbackUrl}) => {
           _clearMsgTimers();
           if(!streamUrl){
             showToast('⚡ Sin resultados en RD — usando 🌐 SV');
@@ -6377,6 +6389,9 @@
           frame.style.display = 'none';
           video.style.display = 'block';
           video.controls = true;
+
+          // ── Toast si el stream es x265 (necesita transcode o soporte nativo) ──
+          if(streamIsX265) showToast('🔄 Optimizando video para tu navegador...');
 
           // ── Detección HEVC nativa del browser ──
           // Chrome 107+ en Mac/Win con GPU moderna puede decodificar h265 sin transcode
@@ -6470,6 +6485,28 @@
                 playerState._srcIdx = SV_SRC_IDX; loadPlayerSource();
               }
             });
+          } else if(streamIsX265 && fallbackUrl){
+            // Plan B: stream es x265, no hay transcode → intentar alternativa H.264
+            showToast('🔄 x265 sin transcode — probando alternativa H.264...');
+            video.src = fallbackUrl; video.load();
+            const _tmoB = setTimeout(function(){
+              if(video.readyState < 2){
+                video.src = '';
+                showToast('⚡ RD: sin compatible — usando 🌐 SV');
+                playerState._srcIdx = SV_SRC_IDX; loadPlayerSource();
+              }
+            }, 12000);
+            video.addEventListener('loadedmetadata', function(){
+              clearTimeout(_tmoB);
+              if(video.duration && isFinite(video.duration) && video.duration <= 35){
+                video.src = ''; playerState._srcIdx = SV_SRC_IDX; loadPlayerSource(); return;
+              }
+              video.play().catch(()=>{}); hideLoadingAndStart();
+            }, { once: true });
+            video.addEventListener('error', function(){
+              clearTimeout(_tmoB);
+              video.src = ''; playerState._srcIdx = SV_SRC_IDX; loadPlayerSource();
+            }, { once: true });
           } else {
             // Sin transcode disponible → play directo (funciona para H.264 nativo)
             video.src = streamUrl; video.load();
