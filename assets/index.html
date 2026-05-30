@@ -3829,23 +3829,20 @@
   async function rdGetStream(tmdbId, type, season, episode){
     if(!RD_TOKEN) return {url:null, rdId:null};
     try {
-      // 1. Obtener IMDB ID desde TMDB
+      // 1. IMDB ID desde TMDB
       const tmdbType = type === 'tv' ? 'tv' : 'movie';
       const extData = await fetch('https://api.themoviedb.org/3/' + tmdbType + '/' + tmdbId
         + '/external_ids?api_key=' + TMDB_KEY).then(r => r.json());
       const imdbId = extData.imdb_id;
-      if(!imdbId){ console.warn('[RD] No IMDB ID para tmdbId='+tmdbId); return {url:null, rdId:null}; }
-      console.log('[RD] IMDB ID:', imdbId);
+      if(!imdbId) return {url:null, rdId:null};
 
       // 2. Buscar stream en Torrentio
       var tPath = type === 'tv'
         ? '/stream/series/' + imdbId + ':' + season + ':' + episode + '.json'
         : '/stream/movie/' + imdbId + '.json';
       var tUrl = 'https://torrentio.strem.fun/realdebrid=' + RD_TOKEN + '|qualityfilter=other,scr,cam' + tPath;
-      console.log('[RD] Torrentio URL:', tUrl);
       const tData = await fetch(tUrl).then(r => r.json());
-      if(!tData.streams || !tData.streams.length){ console.warn('[RD] Sin streams en Torrentio'); return {url:null, rdId:null}; }
-      console.log('[RD] Streams de Torrentio:', tData.streams.length, tData.streams.map(s=>({name:s.name,url:s.url,fn:s.behaviorHints&&s.behaviorHints.filename})));
+      if(!tData.streams || !tData.streams.length) return {url:null, rdId:null};
 
       const ss = tData.streams;
       const info = s => ((s.title||'') + (s.name||'') + (s.behaviorHints&&s.behaviorHints.filename||'')).toLowerCase();
@@ -3859,65 +3856,47 @@
                 || withUrl.find(s => hasH264(s))
                 || withUrl.find(s => hasRD(s))
                 || withUrl[0] || ss[0];
-      if(!best || !best.url){ console.warn('[RD] Sin stream con URL'); return {url:null, rdId:null}; }
-      console.log('[RD] Stream elegido:', {name:best.name, url:best.url, fn:best.behaviorHints&&best.behaviorHints.filename});
+      if(!best || !best.url) return {url:null, rdId:null};
 
-      // 3. Obtener filename del stream para buscar en downloads de RD
+      // 3. Filename del stream
       const streamFilename = (best.behaviorHints && best.behaviorHints.filename)
                           || decodeURIComponent(best.url.split('/').pop().split('?')[0]);
-      console.log('[RD] Filename a buscar:', streamFilename);
 
-      // 4. Si la URL es un proxy de Torrentio, resolverla para obtener la CDN URL real
-      // Esto también "unrestringe" el link en RD, haciendo que aparezca en /downloads
+      // 4. Resolver proxy Torrentio → URL CDN real
       let resolvedUrl = best.url;
       if(best.url.includes('torrentio.strem.fun')){
         try {
-          console.log('[RD] Resolviendo URL proxy de Torrentio...');
           const resolveRes = await fetch(best.url, { redirect: 'follow' });
-          if(resolveRes.url && resolveRes.url !== best.url && resolveRes.url.includes('real-debrid')){
+          if(resolveRes.url && resolveRes.url !== best.url && resolveRes.url.includes('real-debrid'))
             resolvedUrl = resolveRes.url;
-            console.log('[RD] URL resuelta a CDN:', resolvedUrl);
-          }
-        } catch(e){ console.warn('[RD] No se pudo resolver proxy Torrentio:', e.message); }
+        } catch(e){}
       }
 
-      // 5. Buscar en la lista de downloads de RD para obtener el ID real
-      // Estrategia: (a) match por URL CDN exacta, (b) match por filename exacto, (c) match por filename sin extensión
+      // 5. Buscar ID real en downloads de RD para poder llamar al transcode API
       let rdId = null;
       try {
         const downloads = await fetch(
           'https://api.real-debrid.com/rest/1.0/downloads?limit=500',
           { headers: { 'Authorization': 'Bearer ' + RD_TOKEN } }
         ).then(r => r.json());
-        console.log('[RD] Downloads obtenidos:', Array.isArray(downloads) ? downloads.length : downloads);
         if(Array.isArray(downloads)){
           const normUrl = u => u.toLowerCase().split('?')[0];
-          // (a) Match por URL CDN resuelta
           let match = downloads.find(d => d.download && normUrl(d.download) === normUrl(resolvedUrl));
-          // (b) Match por URL original
           if(!match) match = downloads.find(d => d.download && normUrl(d.download) === normUrl(best.url));
-          // (c) Match por filename exacto
           if(!match && streamFilename){
             const fn = streamFilename.toLowerCase();
             match = downloads.find(d => d.filename && d.filename.toLowerCase() === fn);
           }
-          // (d) Match por filename sin extensión
           if(!match && streamFilename){
             const fnBase = streamFilename.toLowerCase().replace(/\.[^.]+$/, '');
             match = downloads.find(d => d.filename && d.filename.toLowerCase().replace(/\.[^.]+$/, '') === fnBase);
           }
-          if(match){
-            rdId = match.id;
-            console.log('[RD] Match encontrado → id:', rdId, 'filename:', match.filename);
-          } else {
-            console.warn('[RD] No match en downloads. Buscando:', streamFilename,
-              '| Primeros 5:', downloads.slice(0,5).map(d=>d.filename));
-          }
+          if(match) rdId = match.id;
         }
-      } catch(e){ console.error('[RD] Error al obtener downloads:', e); rdId = null; }
+      } catch(e){ rdId = null; }
 
       return { url: resolvedUrl !== best.url ? resolvedUrl : best.url, rdId };
-    } catch(e){ console.error('[RD] Error general:', e); return {url:null, rdId:null}; }
+    } catch(e){ return {url:null, rdId:null}; }
   }
 
   // ================================================================
@@ -6385,55 +6364,94 @@
       return;
     }
 
-    // ── REAL-DEBRID — transcoding RD (x265→H.264 HLS) + HLS.js ──
+    // ── REAL-DEBRID ──────────────────────────────────────────────────────────
     if(_activeSrcIdx === RD_SRC_IDX){
       rdGetStream(playerState.id, playerState.type, playerState.season, playerState.episode)
         .then(async ({url: streamUrl, rdId}) => {
           _clearMsgTimers();
           if(!streamUrl){
             showToast('⚡ Sin resultados en RD — usando 🌐 SV');
-            playerState._srcIdx = SV_SRC_IDX;
-            loadPlayerSource();
-            return;
-          }
-
-          // Intentar obtener HLS transcoded de RD usando el ID real del download
-          let hlsUrl = null;
-          if(rdId){
-            try {
-              console.log('[RD] Llamando transcode API con id:', rdId);
-              const tcRes = await fetch(
-                'https://api.real-debrid.com/rest/1.0/streaming/transcode/' + rdId,
-                { headers: { 'Authorization': 'Bearer ' + RD_TOKEN } }
-              );
-              const tcData = await tcRes.json();
-              console.log('[RD] Transcode response:', JSON.stringify(tcData));
-              hlsUrl = (tcData.apple && tcData.apple.full)
-                    || (tcData.dash  && tcData.dash.full)
-                    || (tcData.h264  && tcData.h264.full)
-                    || null;
-              console.log('[RD] HLS URL elegida:', hlsUrl);
-            } catch(e){ console.error('[RD] Error transcode:', e); hlsUrl = null; }
-          } else {
-            console.warn('[RD] Sin rdId — no se puede usar transcode API. Usando URL directa.');
+            playerState._srcIdx = SV_SRC_IDX; loadPlayerSource(); return;
           }
 
           frame.style.display = 'none';
           video.style.display = 'block';
           video.controls = true;
 
+          // ── Detección HEVC nativa del browser ──
+          // Chrome 107+ en Mac/Win con GPU moderna puede decodificar h265 sin transcode
+          const hevcOk = typeof MediaSource !== 'undefined' && (
+            MediaSource.isTypeSupported('video/mp4; codecs="hev1.1.6.L93.B0"') ||
+            MediaSource.isTypeSupported('video/mp4; codecs="hvc1"') ||
+            MediaSource.isTypeSupported('video/mp4; codecs="hev1"')
+          );
+
+          // ── Intento HEVC directo (sin transcode, sin latencia) ──
+          if(hevcOk){
+            let played = false;
+            await new Promise(function(resolve){
+              const tmo = setTimeout(function(){
+                if(!played){ video.src = ''; resolve(); }
+              }, 10000);
+              video.addEventListener('loadedmetadata', function(){
+                clearTimeout(tmo);
+                if(video.duration && isFinite(video.duration) && video.duration > 35){
+                  played = true;
+                  video.play().catch(()=>{}); hideLoadingAndStart(); resolve();
+                } else {
+                  video.src = ''; resolve();
+                }
+              }, { once: true });
+              video.addEventListener('error', function(){ clearTimeout(tmo); video.src=''; resolve(); }, { once: true });
+              video.src = streamUrl; video.load();
+            });
+            if(played) return;
+            // HEVC directo falló → continúa al transcode
+          }
+
+          // ── Transcode HLS via RD API ──
+          let hlsUrl = null;
+          if(rdId){
+            try {
+              const tcData = await fetch(
+                'https://api.real-debrid.com/rest/1.0/streaming/transcode/' + rdId,
+                { headers: { 'Authorization': 'Bearer ' + RD_TOKEN } }
+              ).then(r => r.json());
+              hlsUrl = (tcData.apple && tcData.apple.full)
+                    || (tcData.dash  && tcData.dash.full)
+                    || (tcData.h264  && tcData.h264.full)
+                    || null;
+            } catch(e){ hlsUrl = null; }
+          }
+
           if(hlsUrl){
-            // HLS transcoded por RD (compatible con Chrome)
+            // HLS con timeouts generosos — RD puede tardar 30-90s en transcodar 4K en caliente
             if(window.hlsInstance){ window.hlsInstance.destroy(); window.hlsInstance = null; }
             loadHlsIfNeeded(function(){
               if(window.Hls && window.Hls.isSupported()){
-                const hls = new window.Hls();
+                const hls = new window.Hls({
+                  fragLoadPolicy: {
+                    default: {
+                      maxTimeToFirstByteMs: 90000,
+                      maxLoadTimeMs: 300000,
+                      timeoutRetry: { maxNumRetry: 4, retryDelayMs: 2000, maxRetryDelayMs: 10000 },
+                      errorRetry:   { maxNumRetry: 6, retryDelayMs: 2000, maxRetryDelayMs: 10000 }
+                    }
+                  },
+                  manifestLoadPolicy: {
+                    default: {
+                      maxTimeToFirstByteMs: 60000,
+                      maxLoadTimeMs: 60000,
+                      timeoutRetry: { maxNumRetry: 3, retryDelayMs: 1000, maxRetryDelayMs: 5000 },
+                      errorRetry:   { maxNumRetry: 3, retryDelayMs: 1000, maxRetryDelayMs: 5000 }
+                    }
+                  }
+                });
                 window.hlsInstance = hls;
                 hls.loadSource(hlsUrl);
                 hls.attachMedia(video);
                 hls.on(window.Hls.Events.MANIFEST_PARSED, function(){
-                  video.play().catch(()=>{});
-                  hideLoadingAndStart();
+                  video.play().catch(()=>{}); hideLoadingAndStart();
                 });
                 hls.on(window.Hls.Events.ERROR, function(ev, data){
                   if(data.fatal){
@@ -6453,28 +6471,24 @@
               }
             });
           } else {
-            // Sin HLS → directo (funciona para H.264, falla en x265)
-            video.src = streamUrl;
-            video.load();
+            // Sin transcode disponible → play directo (funciona para H.264 nativo)
+            video.src = streamUrl; video.load();
             const _tmo = setTimeout(function(){
               if(video.readyState < 2){
                 video.src = '';
-                showToast('⚡ RD: codec no compatible — usando 🌐 SV');
+                showToast('⚡ RD: no compatible — usando 🌐 SV');
                 playerState._srcIdx = SV_SRC_IDX; loadPlayerSource();
               }
-            }, 8000);
+            }, 10000);
             video.addEventListener('loadedmetadata', function(){
               clearTimeout(_tmo);
               if(video.duration && isFinite(video.duration) && video.duration <= 35){
-                showToast('⚡ RD: archivo eliminado — cambiando a 🌐 SV');
                 video.src = ''; playerState._srcIdx = SV_SRC_IDX; loadPlayerSource(); return;
               }
-              video.play().catch(()=>{});
-              hideLoadingAndStart();
+              video.play().catch(()=>{}); hideLoadingAndStart();
             }, { once: true });
             video.addEventListener('error', function(){
               clearTimeout(_tmo);
-              showToast('⚡ RD: error — usando 🌐 SV');
               video.src = ''; playerState._srcIdx = SV_SRC_IDX; loadPlayerSource();
             }, { once: true });
           }
@@ -6482,8 +6496,7 @@
         .catch(()=>{
           _clearMsgTimers();
           showToast('⚡ Error con RD — usando 🌐 SV');
-          playerState._srcIdx = SV_SRC_IDX;
-          loadPlayerSource();
+          playerState._srcIdx = SV_SRC_IDX; loadPlayerSource();
         });
       return;
     }
